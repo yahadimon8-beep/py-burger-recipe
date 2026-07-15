@@ -1,72 +1,92 @@
 from abc import ABC, abstractmethod
-import typing
+from typing import Any, Optional, List, Union
 
 
 class Validator(ABC):
-    """Base validator class for descriptors."""
+    """Базовий абстрактний клас для дескрипторів валідації."""
 
-    protected_name: str
+    def __init__(self, protected_name: str) -> None:
+        self.protected_name = f"_{protected_name}"
 
     def __set_name__(self, owner: type, name: str) -> None:
-        """Set the protected name for the attribute."""
+        """Метод для ініціалізації імені дескриптора."""
         self.protected_name = f"_{name}"
 
-    def __get__(self, obj: typing.Any, obj_type: type = None) -> typing.Any:
-        """Get the attribute value from the object."""
-        return getattr(obj, self.protected_name)
-
-    def __set__(self, obj: typing.Any, value: typing.Any) -> None:
-        """Set the attribute value after validation."""
-        self.validate(value)
+    def __set__(self, obj: object, value: Any) -> None:
+        """Встановлює значення атрибута без валідації."""
         setattr(obj, self.protected_name, value)
 
+    def __get__(self, obj: object, objtype: Optional[type] = None) -> Any:
+        """Повертає значення атрибута."""
+        return getattr(obj, self.protected_name)
+
     @abstractmethod
-    def validate(self, value: typing.Any) -> None:
-        """Validate the value."""
+    def validate(self, value: Any) -> None:
+        """Абстрактний метод для валідації значення."""
         pass
 
 
 class Number(Validator):
-    """Validator for numeric values within a range."""
-    def __init__(self, min_value: int, max_value: int) -> None:
-        """Initialize the Number validator with min and max values."""
+    """Descriptor for validating integer values within a range."""
+
+    def __init__(
+        self,
+        protected_name: str,
+        min_value: Optional[int] = None,
+        max_value: Optional[int] = None,
+    ) -> None:
+        super().__init__(protected_name)
         self.min_value = min_value
         self.max_value = max_value
 
-    def validate(self, value: typing.Any) -> None:
-        """Validate that the value is within the specified range."""
-        if not isinstance(value, int):
+    def __set__(self, obj: object, value: Union[int, float]) -> None:
+        """Встановлює значення після валідації."""
+        self.validate(value)
+        super().__set__(obj, value)
+
+    def validate(self, value: Any) -> None:
+        """Перевіряє, чи значення є числом і потрапляє в діапазон."""
+        if not isinstance(value, (int, float)):
             raise TypeError("Quantity should be integer.")
-        if not (self.min_value <= value <= self.max_value):
+        if self.min_value is not None and value < self.min_value:
             raise ValueError(
-                f"Quantity should not be less than {self.min_value} "
-                f"and greater than {self.max_value}."
+                f"{self.protected_name[1:]} must be >= {self.min_value}"
+            )
+        if self.max_value is not None and value > self.max_value:
+            raise ValueError(
+                f"{self.protected_name[1:]} must be <= {self.max_value}"
             )
 
 
 class OneOf(Validator):
-    """Validator for values from a predefined set of options."""
-    def __init__(self, *options: typing.Any) -> None:
-        """Initialize with allowed options."""
+    """Дескриптор для валідації значень з фіксованого списку."""
+
+    def __init__(self, protected_name: str, options: List[Any]) -> None:
+        super().__init__(protected_name)
         self.options = options
 
-    def validate(self, value: typing.Any) -> None:
-        """Validate that the value is one of the allowed options."""
+    def __set__(self, obj: object, value: Any) -> None:
+        """Встановлює значення після валідації."""
+        self.validate(value)
+        super().__set__(obj, value)
+
+    def validate(self, value: Any) -> None:
+        """Перевіряє, чи значення міститься в списку допустимих значень."""
         if value not in self.options:
             raise ValueError(
-                f"Expected {value} to be one of {self.options}."
+                f"Expected {value} to be one of {tuple(self.options)}."
             )
 
 
 class BurgerRecipe:
     """Class representing a burger recipe with validated ingredients."""
 
-    buns = Number(min_value=2, max_value=3)
-    cheese = Number(min_value=0, max_value=2)
-    tomatoes = Number(min_value=0, max_value=3)
-    cutlets = Number(min_value=1, max_value=3)
-    eggs = Number(min_value=0, max_value=2)
-    sauce = OneOf("ketchup", "mayo", "burger")
+    buns = Number("buns", min_value=2, max_value=3)
+    cheese = Number("cheese", min_value=0, max_value=2)
+    tomatoes = Number("tomatoes", min_value=0, max_value=3)
+    cutlets = Number("cutlets", min_value=1, max_value=3)
+    eggs = Number("eggs", min_value=0, max_value=2)
+    sauce = OneOf("sauce", options=["ketchup", "mayo", "burger"])
 
     def __init__(
         self,
