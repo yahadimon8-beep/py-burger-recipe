@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, List, Union
+from typing import Any, Optional, List
 
 
 class Validator(ABC):
@@ -39,14 +39,14 @@ class Number(Validator):
         self.min_value = min_value
         self.max_value = max_value
 
-    def __set__(self, obj: object, value: Union[int, float]) -> None:
+    def __set__(self, obj: object, value: int) -> None:
         """Встановлює значення після валідації."""
         self.validate(value)
         super().__set__(obj, value)
 
     def validate(self, value: Any) -> None:
         """Перевіряє, чи значення є числом і потрапляє в діапазон."""
-        if not isinstance(value, (int, float)):
+        if not isinstance(value, int):
             raise TypeError("Quantity should be integer.")
         if self.min_value is not None and value < self.min_value:
             raise ValueError(
